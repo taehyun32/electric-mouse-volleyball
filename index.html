@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>전기쥐 배구</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#0c1024" />
+    <style>
+      :root {
+        --bg1: #0c1024;
+        --bg2: #1a2250;
+        --sand1: #f0d19a;
+        --sand2: #dcb477;
+        --net: #ffffff;
+        --ui: #0c1024cc;
+        --brand: #ffd54d;
+        --accent: #ff6e40;
+        --ok: #00c853;
+        --warn: #ffab00;
+        --txt: #e6ecff;
+        --txtDim: #b8c1ec;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: radial-gradient(1200px 800px at 50% 0%, #162054 0%, var(--bg1) 70%);
+        color: var(--txt);
+        font-family: ui-rounded, "Pretendard Variable", "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto,
+          Helvetica, Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        height: 100%;
+        overflow: hidden;
+      }
+      #wrap {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: clamp(8px, 2vw, 24px);
+      }
+      canvas {
+        width: min(100vw - 16px, 1200px);
+        height: auto;
+        aspect-ratio: 16 / 9;
+        border-radius: 12px;
+        background: linear-gradient(#7ec8ff, #9ad6ff 40%, #bce7ff 60%, #e8f7ff 70%);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+      #hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        padding: 8px 12px;
+      }
+      .scorebar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        user-select: none;
+      }
+      .badge {
+        background: #0c102480;
+        border: 1px solid #ffffff22;
+        padding: 6px 10px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(8px);
+      }
+      .badge .name {
+        font-weight: 700;
+        letter-spacing: 0.2px;
+      }
+      .badge .pts {
+        font-size: 20px;
+        font-weight: 800;
+      }
+      .badge.l {
+        color: #ffd54d;
+      }
+      .badge.r {
+        color: #ff8a80;
+      }
+      .badge .serve {
+        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        border: 1px solid #ffffff33;
+        background: #ffffff10;
+        color: #fff;
+      }
+      .centerLabel {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: auto;
+        bottom: 12px; /* 안내를 하단으로 이동하여 스코어와 겹치지 않음 */
+        pointer-events: none;
+        user-select: none;
+        text-align: center;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      }
+      #overlay {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(180deg, #0b0f26bb, #0b0f2699 30%, #0b0f2600 70%);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        padding: 24px;
+      }
+      #overlay.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .panel {
+        width: min(720px, 92vw);
+        background: linear-gradient(180deg, #111531dd, #0d112ccc);
+        border: 1px solid #ffffff1a;
+        border-radius: 16px;
+        padding: clamp(16px, 3vw, 28px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(8px);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(22px, 4vw, 36px);
+        color: var(--brand);
+        text-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+      }
+      .subtitle {
+        margin-bottom: 18px;
+        color: var(--txtDim);
+      }
+      .grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+      .field {
+        display: grid;
+        gap: 6px;
+        background: #0b0f2640;
+        border: 1px solid #ffffff18;
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+      .field label {
+        font-size: 12px;
+        color: var(--txtDim);
+      }
+      .choices {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .chip {
+        appearance: none;
+        border: 1px solid #ffffff22;
+        background: #ffffff0f;
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .chip[data-active="true"] {
+        border-color: var(--ok);
+        box-shadow: inset 0 0 0 1px var(--ok);
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .btn {
+        appearance: none;
+        border: 1px solid #ffffff33;
+        background: linear-gradient(180deg, #21c36a, #0fb85d);
+        color: #071a0f;
+        font-weight: 800;
+        padding: 12px 16px;
+        border-radius: 12px;
+        cursor: pointer;
+        box-shadow: 0 8px 20px rgba(0, 200, 120, 0.35);
+      }
+      .btn.secondary {
+        background: linear-gradient(180deg, #2e3a8b, #1c2772);
+        color: #e6ecff;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+      }
+      .kbd {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #00000055;
+        border: 1px solid #ffffff22;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+      .hint {
+        color: var(--txtDim);
+        font-size: 13px;
+      }
+      .footer {
+        text-align: center;
+        color: #ffffff88;
+        font-size: 12px;
+        margin-top: 6px;
+      }
+      .win {
+        font-weight: 800;
+        color: #fff;
+        background: linear-gradient(90deg, #00e676, #64ffda);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      @media (max-width: 720px) {
+        .badge .pts {
+          font-size: 18px;
+        }
+        .badge .name {
+          font-size: 13px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <canvas id="game" width="1920" height="1080" aria-label="Chu Volleyball"></canvas>
+    </div>
+
+    <div id="hud" aria-hidden="false">
+      <div class="scorebar">
+        <div class="badge l" id="badgeL">
+          <span class="name" id="nameL">Sparky</span>
+          <span class="pts" id="ptsL">0</span>
+          <span class="serve" id="srvL" style="display: none">Serve</span>
+        </div>
+        <div class="badge r" id="badgeR">
+          <span class="name" id="nameR">Bolt</span>
+          <span class="pts" id="ptsR">0</span>
+          <span class="serve" id="srvR" style="display: none">Serve</span>
+        </div>
+      </div>
+      <div class="centerLabel">
+        <div class="hint">1P: A/D, W, Space • 2P: ←/→, ↑, Right Shift • P/Esc: 일시정지</div>
+      </div>
+      <div></div>
+    </div>
+
+    <div id="overlay" class="show" role="dialog" aria-modal="true">
+      <div class="panel">
+        <h1>전기쥐 배구</h1>
+        <div class="subtitle">전기쥐와 재밌는 배구!</div>
+
+        <div class="grid" style="margin-bottom: 14px">
+          <div class="field">
+            <label>게임 모드</label>
+            <div class="choices" id="modeChoices">
+              <button class="chip" data-value="cpu" data-active="true">싱글(대 CPU)</button>
+              <button class="chip" data-value="pvp">2인 로컬(한 키보드)</button>
+            </div>
+          </div>
+          <div class="field" id="cpuField">
+            <label>AI 난이도</label>
+            <div class="choices" id="aiChoices">
+              <button class="chip" data-value="easy">Easy</button>
+              <button class="chip" data-value="normal" data-active="true">Normal</button>
+              <button class="chip" data-value="hard">Hard</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>목표 점수</label>
+            <div class="choices" id="goalChoices">
+              <button class="chip" data-value="7">7</button>
+              <button class="chip" data-value="11" data-active="true">11</button>
+              <button class="chip" data-value="15">15</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>승점 규칙</label>
+            <div class="choices" id="ruleChoices">
+              <button class="chip" data-value="std" data-active="true">일반(선득점 승)</button>
+              <button class="chip" data-value="by2">2점 차 승</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="justify-content: space-between; align-items: center">
+          <div class="hint">
+            1P: <span class="kbd">A/D</span> 좌우, <span class="kbd">W</span> 점프,
+            <span class="kbd">Space</span> 스파이크<br />
+            2P: <span class="kbd">←/→</span> 좌우, <span class="kbd">↑</span> 점프,
+            <span class="kbd">Right Shift</span> 스파이크<br />
+            스파이크: 공이 몸에 닿을 때 Space/Right Shift(누르고 있어도 OK), 위키와 함께 누르면 더 떠요.
+          </div>
+          <div class="row">
+            <button class="btn" id="startBtn">게임 시작</button>
+            <button class="btn secondary" id="howBtn" type="button">조작법</button>
+          </div>
+        </div>
+        <div class="footer">본 게임은 오리지널 캐릭터로 제공됩니다.</div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        // Canvas and DPI setup
+        const canvas = document.getElementById("game");
+        const ctx = canvas.getContext("2d", {alpha: false, desynchronized: true});
+        const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+        const WORLD_W = 960,
+          WORLD_H = 540;
+        function resizeCanvas() {
+          const targetW = WORLD_W * DPR,
+            targetH = WORLD_H * DPR;
+          if (canvas.width !== targetW || canvas.height !== targetH) {
+            canvas.width = targetW;
+            canvas.height = targetH;
+          }
+          ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        }
+        resizeCanvas();
+        window.addEventListener("resize", resizeCanvas);
+
+        // UI elements
+        const overlay = document.getElementById("overlay");
+        const startBtn = document.getElementById("startBtn");
+        const howBtn = document.getElementById("howBtn");
+        const modeChoices = document.getElementById("modeChoices");
+        const aiChoices = document.getElementById("aiChoices");
+        const goalChoices = document.getElementById("goalChoices");
+        const ruleChoices = document.getElementById("ruleChoices");
+        const cpuField = document.getElementById("cpuField");
+
+        const nameL = document.getElementById("nameL");
+        const nameR = document.getElementById("nameR");
+        const ptsL = document.getElementById("ptsL");
+        const ptsR = document.getElementById("ptsR");
+        const srvL = document.getElementById("srvL");
+        const srvR = document.getElementById("srvR");
+
+        // Choice helpers
+        function bindChoiceGroup(container, onChange) {
+          container.addEventListener("click", (e) => {
+            const btn = e.target.closest(".chip");
+            if (!btn) return;
+            for (const b of container.querySelectorAll(".chip")) b.dataset.active = "false";
+            btn.dataset.active = "true";
+            onChange(btn.dataset.value);
+          });
+        }
+        function setActiveByValue(container, value) {
+          for (const b of container.querySelectorAll(".chip")) {
+            b.dataset.active = b.dataset.value === value ? "true" : "false";
+          }
+        }
+        const store = {
+          get(key, fallback) {
+            try {
+              return JSON.parse(localStorage.getItem(key)) ?? fallback;
+            } catch {
+              return fallback;
+            }
+          },
+          set(key, val) {
+            try {
+              localStorage.setItem(key, JSON.stringify(val));
+            } catch {}
+          },
+        };
+        const options = {
+          mode: store.get("chu.mode", "cpu"),
+          ai: store.get("chu.ai", "normal"),
+          goal: store.get("chu.goal", 11),
+          rule: store.get("chu.rule", "std"),
+        };
+        setActiveByValue(modeChoices, options.mode);
+        setActiveByValue(aiChoices, options.ai);
+        setActiveByValue(goalChoices, String(options.goal));
+        setActiveByValue(ruleChoices, options.rule);
+        cpuField.style.display = options.mode === "cpu" ? "" : "none";
+        bindChoiceGroup(modeChoices, (val) => {
+          options.mode = val;
+          store.set("chu.mode", options.mode);
+          cpuField.style.display = val === "cpu" ? "" : "none";
+        });
+        bindChoiceGroup(aiChoices, (val) => {
+          options.ai = val;
+          store.set("chu.ai", options.ai);
+        });
+        bindChoiceGroup(goalChoices, (val) => {
+          options.goal = parseInt(val, 10);
+          store.set("chu.goal", options.goal);
+        });
+        bindChoiceGroup(ruleChoices, (val) => {
+          options.rule = val;
+          store.set("chu.rule", options.rule);
+        });
+
+        howBtn.addEventListener("click", () => {
+          alert(
+            [
+              "[조작]",
+              "1P: A/D 좌우, W 점프, Space 스파이크(탭/홀드 가능)",
+              "2P: ←/→ 좌우, ↑ 점프, Right Shift 스파이크(탭/홀드 가능)",
+              "",
+              "[플레이]",
+              "- 공이 내 코트 바닥에 닿으면 상대 득점",
+              "- 네트에 맞고 넘겨도 됨",
+              "- 스파이크: 공이 몸에 닿는 순간 입력 시 강타, 위키와 함께 누르면 더 떠요",
+              "",
+              "[기타]",
+              "P 또는 Esc: 일시정지",
+              "R: 라운드 리셋",
+              "F3: 디버그 표시",
+            ].join("\n")
+          );
+        });
+
+        // World constants
+        const GROUND_Y = WORLD_H - 64;
+        const NET_W = 12,
+          NET_H = 210;
+        const NET_X = WORLD_W / 2 - NET_W / 2;
+        const NET_TOP = GROUND_Y - NET_H;
+        const LEFT_LIMIT = 40,
+          RIGHT_LIMIT = WORLD_W - 40;
+        const BALL_R = 16;
+        const PLAYER_R = 38;
+
+        // Physics profile
+        const PHYS = {
+          g: 2200,
+          substep: 1 / 240,
+          maxSubsteps: 16,
+          ball: {mass: 1, maxSpeed: 1200, airDrag: 0.0, spinK: 0.035},
+          player: {mass: 8},
+          cor: {wall: 0.85, net: 0.6, player: 0.78, ceil: 0.75},
+          fric: {wall: 0.02, net: 0.1, player: 0.35},
+        };
+
+        // Audio
+        const AudioKit = (() => {
+          const ctxA =
+            typeof AudioContext !== "undefined"
+              ? new AudioContext()
+              : typeof webkitAudioContext !== "undefined"
+              ? new webkitAudioContext()
+              : null;
+          let unlocked = false;
+          function unlock() {
+            if (!ctxA || unlocked) return;
+            const o = ctxA.createOscillator(),
+              g = ctxA.createGain();
+            o.connect(g);
+            g.connect(ctxA.destination);
+            g.gain.value = 0;
+            o.start();
+            o.stop(ctxA.currentTime + 0.01);
+            unlocked = true;
+          }
+          function beep(type = "square", freq = 660, dur = 0.07, vol = 0.04) {
+            if (!ctxA) return;
+            const now = ctxA.currentTime,
+              o = ctxA.createOscillator(),
+              g = ctxA.createGain();
+            o.type = type;
+            o.frequency.value = freq;
+            g.gain.value = 0;
+            o.connect(g);
+            g.connect(ctxA.destination);
+            o.start(now);
+            g.gain.linearRampToValueAtTime(vol, now + 0.005);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+            o.stop(now + dur + 0.02);
+          }
+          function chord(freqs = [440, 660], dur = 0.12, vol = 0.03) {
+            if (!ctxA) return;
+            const now = ctxA.currentTime,
+              g = ctxA.createGain();
+            g.connect(ctxA.destination);
+            g.gain.value = 0;
+            g.gain.linearRampToValueAtTime(vol, now + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+            for (const f of freqs) {
+              const o = ctxA.createOscillator();
+              o.type = "sine";
+              o.frequency.value = f;
+              o.connect(g);
+              o.start(now);
+              o.stop(now + dur + 0.02);
+            }
+          }
+          return {ctx: ctxA, unlock, beep, chord};
+        })();
+        window.addEventListener("pointerdown", AudioKit.unlock, {once: true});
+        window.addEventListener("keydown", AudioKit.unlock, {once: true});
+
+        // Input
+        const keys = new Map();
+        function setKey(code, isDown) {
+          let k = keys.get(code);
+          if (!k) keys.set(code, (k = {down: false, downAt: 0, upAt: 0}));
+          if (k.down === isDown) return;
+          k.down = isDown;
+          const t = performance.now();
+          if (isDown) k.downAt = t;
+          else k.upAt = t;
+        }
+        function isDown(code) {
+          return keys.get(code)?.down || false;
+        }
+        function pressedWithin(code, ms) {
+          const k = keys.get(code);
+          if (!k) return false;
+          return k.down && performance.now() - k.downAt <= ms;
+        }
+        window.addEventListener("keydown", (e) => {
+          if (["Space", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+          setKey(e.code, true);
+        });
+        window.addEventListener("keyup", (e) => setKey(e.code, false));
+
+        // Helpers
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        const hypot = (x, y) => Math.sqrt(x * x + y * y) || 0.000001;
+
+        // Entities
+        class Ball {
+          constructor() {
+            this.x = WORLD_W * 0.25;
+            this.y = 200;
+            this.vx = 0;
+            this.vy = 0;
+            this.r = BALL_R;
+            this.spin = 0;
+            this.flash = 0; // 스파이크 번쩍 이펙트 타이머
+            this.live = true;
+            this.touchCountL = 0;
+            this.touchCountR = 0;
+          }
+          resetForServe(serverLeft) {
+            this.live = true;
+            this.spin = 0;
+            this.flash = 0;
+            this.touchCountL = 0;
+            this.touchCountR = 0;
+            const sideX = serverLeft ? WORLD_W * 0.25 : WORLD_W * 0.75;
+            this.x = sideX;
+            // 더 높은 시작 위치 + 네트를 넘는 속도로 시작
+            this.y = Math.max(64, NET_TOP - 160);
+            const toward = serverLeft ? 1 : -1;
+            this.vx = toward * 600; // 540~640 권장
+            this.vy = -180; // -150~-220 권장
+          }
+          applySpeedCap() {
+            const s = hypot(this.vx, this.vy);
+            if (s > PHYS.ball.maxSpeed) {
+              const k = PHYS.ball.maxSpeed / s;
+              this.vx *= k;
+              this.vy *= k;
+            }
+          }
+          collideWallAndCeil() {
+            if (this.x - this.r < 0) {
+              this.x = this.r;
+              this.vx = Math.abs(this.vx) * PHYS.cor.wall;
+              this.vy *= 1 - PHYS.fric.wall;
+              AudioKit.beep("square", 220, 0.05, 0.02);
+            } else if (this.x + this.r > WORLD_W) {
+              this.x = WORLD_W - this.r;
+              this.vx = -Math.abs(this.vx) * PHYS.cor.wall;
+              this.vy *= 1 - PHYS.fric.wall;
+              AudioKit.beep("square", 220, 0.05, 0.02);
+            }
+            if (this.y - this.r < 0) {
+              this.y = this.r;
+              this.vy = Math.abs(this.vy) * PHYS.cor.ceil;
+              this.vx *= 1 - PHYS.fric.wall;
+              AudioKit.beep("triangle", 700, 0.04, 0.02);
+            }
+          }
+          collideNet() {
+            const nx0 = NET_X,
+              nx1 = NET_X + NET_W,
+              ny0 = NET_TOP,
+              ny1 = GROUND_Y;
+            const nearestX = clamp(this.x, nx0, nx1);
+            const nearestY = clamp(this.y, ny0, ny1);
+            const dx = this.x - nearestX,
+              dy = this.y - nearestY;
+            const d2 = dx * dx + dy * dy,
+              rr = this.r * this.r;
+            if (d2 < rr) {
+              const d = Math.sqrt(Math.max(1e-6, d2));
+              const nx = dx / d,
+                ny = dy / d;
+              const overlap = this.r - d + 0.5;
+              this.x += nx * overlap;
+              this.y += ny * overlap;
+              const vdot = this.vx * nx + this.vy * ny;
+              if (vdot < 0) {
+                const e = PHYS.cor.net,
+                  m = PHYS.ball.mass;
+                const J = -(1 + e) * vdot * m;
+                this.vx += (J / m) * nx;
+                this.vy += (J / m) * ny;
+                let tvx = this.vx - (this.vx * nx + this.vy * ny) * nx;
+                let tvy = this.vy - (this.vx * nx + this.vy * ny) * ny;
+                const vt = hypot(tvx, tvy);
+                if (vt > 0.0001) {
+                  const tx = tvx / vt,
+                    ty = tvy / vt,
+                    mu = PHYS.fric.net;
+                  const JT = -Math.min(vt * m, Math.abs(J) * mu);
+                  this.vx += (JT / m) * tx;
+                  this.vy += (JT / m) * ty;
+                  this.spin += JT * PHYS.ball.spinK;
+                }
+                this.applySpeedCap();
+                AudioKit.beep("square", 320, 0.05, 0.025);
+              }
+            }
+          }
+          collidePlayer(p) {
+            const rad = this.r + PLAYER_R;
+            let dx = this.x - p.x,
+              dy = this.y - p.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 >= rad * rad) return false;
+
+            let d = Math.sqrt(Math.max(1e-6, d2));
+            let nx = dx / d,
+              ny = dy / d;
+            if (!isFinite(nx) || !isFinite(ny)) {
+              nx = 1;
+              ny = 0;
+              d = 0.001;
+            }
+            const overlap = rad - d + 0.5;
+            this.x += nx * overlap;
+            this.y += ny * overlap;
+
+            const rvx = this.vx - p.vx,
+              rvy = this.vy - p.vy;
+            const vrel = rvx * nx + rvy * ny;
+            const mb = PHYS.ball.mass,
+              mp = PHYS.player.mass;
+
+            if (vrel < 0) {
+              const e = PHYS.cor.player;
+              const J = (-(1 + e) * vrel) / (1 / mb + 1 / mp);
+              this.vx += (J / mb) * nx;
+              this.vy += (J / mb) * ny;
+              p.vx -= (J / mp) * nx;
+              p.vy -= (J / mp) * ny;
+
+              let tvx = rvx - vrel * nx,
+                tvy = rvy - vrel * ny;
+              const vt = hypot(tvx, tvy);
+              if (vt > 0.0001) {
+                const tx = tvx / vt,
+                  ty = tvy / vt,
+                  mu = PHYS.fric.player;
+                const JT_ideal = -vt / (1 / mb + 1 / mp);
+                const JT = clamp(JT_ideal, -mu * Math.abs(J), mu * Math.abs(J));
+                this.vx += (JT / mb) * tx;
+                this.vy += (JT / mb) * ty;
+                p.vx -= (JT / mp) * tx;
+                p.vy -= (JT / mp) * ty;
+                this.spin += JT * PHYS.ball.spinK;
+              }
+            }
+
+            // Spike impulse
+            if (p.canSpike()) {
+              const towardNet = p.side === "L" ? 1 : -1;
+              const aimUp = p.isPressingUp();
+              const power = 520 + Math.random() * 40;
+              const up = aimUp ? 420 : 300;
+              const ix = towardNet * power,
+                iy = -up;
+              const mix = 0.35;
+              this.vx = this.vx * (1 - mix) + ix * mix;
+              this.vy = this.vy * (1 - mix) + iy * mix;
+              this.spin += towardNet * 0.7 + (aimUp ? 0.3 : 0);
+              this.flash = 0.2; // 공 번쩍
+              p.hitFX = 0.25; // 머리 위 "HIT!"
+              p.lockSpike();
+              AudioKit.beep("square", 880, 0.08, 0.04);
+            } else {
+              AudioKit.beep("triangle", 520, 0.035, 0.022);
+            }
+
+            if (p.side === "L") this.touchCountL++;
+            else this.touchCountR++;
+            this.applySpeedCap();
+            return true;
+          }
+          update(dt, players) {
+            if (!this.live) return;
+            this.vy += PHYS.g * dt;
+            if (PHYS.ball.airDrag > 0) {
+              const drag = Math.exp(-PHYS.ball.airDrag * dt * 60);
+              this.vx *= drag;
+            }
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+
+            this.collideWallAndCeil();
+            this.collideNet();
+            for (const p of players) this.collidePlayer(p);
+
+            if (this.y + this.r >= GROUND_Y) {
+              this.y = GROUND_Y - this.r;
+              this.live = false;
+              const leftSide = this.x < NET_X;
+              GameEvents.pointScored(leftSide ? "R" : "L", {x: this.x, y: this.y});
+            }
+
+            this.spin *= 1 - 0.25 * dt;
+            this.flash = Math.max(0, this.flash - dt);
+          }
+          draw(ctx) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.spin * 0.15);
+            const grad = ctx.createRadialGradient(-6, -6, 4, 0, 0, BALL_R + 8);
+            grad.addColorStop(0, "#fffefb");
+            grad.addColorStop(1, "#ffd27f");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#ffb74d";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.r * 0.62, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(0, 0, this.r * 0.3, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Spike flash ring
+            if (this.flash > 0) {
+              const t = this.flash / 0.2;
+              ctx.globalAlpha = t;
+              ctx.strokeStyle = "rgba(255,240,0,0.95)";
+              ctx.lineWidth = 4;
+              ctx.beginPath();
+              ctx.arc(0, 0, this.r + 8 + (1 - t) * 12, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.globalAlpha = 1;
+            }
+            ctx.restore();
+          }
+        }
+
+        class Player {
+          constructor(side, isCPU = false, aiProfile = "normal") {
+            this.side = side;
+            this.x = side === "L" ? WORLD_W * 0.2 : WORLD_W * 0.8;
+            this.y = GROUND_Y - PLAYER_R;
+            this.vx = 0;
+            this.vy = 0;
+            this.onGround = true;
+            this.color = side === "L" ? "#ffd54d" : "#ff8a65";
+            this.eyeBlink = 0;
+            this.isCPU = isCPU;
+            this.ai = this.makeAI(aiProfile);
+            this.name = isCPU ? "CPU" : side === "L" ? "Sparky" : "Bolt";
+            this.hitCooldown = 0;
+            this.hitFX = 0; // 머리 위 "HIT!" 타이머
+          }
+          bounds() {
+            const netEdge = this.side === "L" ? NET_X - PLAYER_R : NET_X + NET_W + PLAYER_R;
+            const minX = this.side === "L" ? LEFT_LIMIT : Math.max(netEdge, NET_X + NET_W + PLAYER_R);
+            const maxX = this.side === "L" ? Math.min(netEdge, NET_X - PLAYER_R) : RIGHT_LIMIT;
+            return [minX, maxX];
+          }
+          canSpike() {
+            if (this.isCPU) return this.ai.hit;
+            const tapOk = this.side === "L" ? pressedWithin("Space", 200) : pressedWithin("ShiftRight", 200);
+            const holdOk = this.side === "L" ? isDown("Space") : isDown("ShiftRight");
+            return (tapOk || holdOk) && this.hitCooldown <= 0;
+          }
+          lockSpike() {
+            this.hitCooldown = 0.16;
+          }
+          isPressingUp() {
+            return this.isCPU ? this.ai.wantUp : this.side === "L" ? isDown("KeyW") : isDown("ArrowUp");
+          }
+          handleInput(dt) {
+            const accel = 2600,
+              maxSpeed = 420;
+            let left = false,
+              right = false,
+              jump = false;
+            if (this.isCPU) ({left, right, jump} = this.ai);
+            else {
+              if (this.side === "L") {
+                left = isDown("KeyA");
+                right = isDown("KeyD");
+                jump = isDown("KeyW");
+              } else {
+                left = isDown("ArrowLeft");
+                right = isDown("ArrowRight");
+                jump = isDown("ArrowUp");
+              }
+            }
+            const dir = (left ? -1 : 0) + (right ? 1 : 0);
+            this.vx += dir * accel * dt;
+            if (dir === 0) {
+              const fric = this.onGround ? 0.85 : 0.95;
+              this.vx *= Math.pow(fric, dt * 60);
+            }
+            this.vx = clamp(this.vx, -maxSpeed, maxSpeed);
+            if (jump && this.onGround) {
+              this.vy = -900;
+              this.onGround = false;
+              AudioKit.beep("sawtooth", 520, 0.05, 0.025);
+            }
+          }
+          update(dt, ball) {
+            this.hitCooldown = Math.max(0, this.hitCooldown - dt);
+            this.hitFX = Math.max(0, this.hitFX - dt);
+
+            this.handleInput(dt);
+            this.vy += PHYS.g * dt;
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+
+            const [minX, maxX] = this.bounds();
+            if (this.x < minX) {
+              this.x = minX;
+              this.vx = Math.max(0, this.vx);
+            }
+            if (this.x > maxX) {
+              this.x = maxX;
+              this.vx = Math.min(0, this.vx);
+            }
+
+            const groundLevel = GROUND_Y - PLAYER_R;
+            if (this.y > groundLevel) {
+              this.y = groundLevel;
+              this.vy = 0;
+              this.onGround = true;
+            } else {
+              this.onGround = false;
+            }
+
+            if (this.isCPU) this.updateAI(dt, ball);
+
+            this.eyeBlink += dt;
+            if (this.eyeBlink > 4 + Math.random() * 2) this.eyeBlink = -0.12;
+          }
+          draw(ctx) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+
+            // shadow
+            const shw = ctx.createRadialGradient(0, PLAYER_R - 4, 4, 0, PLAYER_R - 4, PLAYER_R * 1.1);
+            shw.addColorStop(0, "rgba(0,0,0,.35)");
+            shw.addColorStop(1, "rgba(0,0,0,0)");
+            ctx.fillStyle = shw;
+            ctx.beginPath();
+            ctx.ellipse(0, PLAYER_R - 6, PLAYER_R * 0.95, PLAYER_R * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // tail (stylized)
+            ctx.save();
+            ctx.translate(this.side === "L" ? -PLAYER_R * 0.9 : PLAYER_R * 0.9, -PLAYER_R * 0.2);
+            ctx.strokeStyle = "#b9802a";
+            ctx.lineWidth = 7;
+            ctx.lineJoin = "miter";
+            ctx.beginPath();
+            const dir = this.side === "L" ? -1 : 1;
+            ctx.moveTo(0, 0);
+            ctx.lineTo(12 * dir, -12);
+            ctx.lineTo(22 * dir, 4);
+            ctx.lineTo(34 * dir, -10);
+            ctx.stroke();
+            ctx.restore();
+
+            // body
+            const bodyGrad = ctx.createLinearGradient(0, -PLAYER_R, 0, PLAYER_R);
+            bodyGrad.addColorStop(0, "#fff7d1");
+            bodyGrad.addColorStop(1, this.color);
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.arc(0, 0, PLAYER_R, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ears
+            ctx.fillStyle = "#2f2410";
+            ctx.beginPath();
+            ctx.moveTo(-PLAYER_R * 0.5, -PLAYER_R * 0.4);
+            ctx.quadraticCurveTo(-PLAYER_R * 0.9, -PLAYER_R * 1.2, -PLAYER_R * 0.3, -PLAYER_R * 0.95);
+            ctx.quadraticCurveTo(-PLAYER_R * 0.15, -PLAYER_R * 0.6, -PLAYER_R * 0.5, -PLAYER_R * 0.4);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(PLAYER_R * 0.5, -PLAYER_R * 0.4);
+            ctx.quadraticCurveTo(PLAYER_R * 0.9, -PLAYER_R * 1.2, PLAYER_R * 0.3, -PLAYER_R * 0.95);
+            ctx.quadraticCurveTo(PLAYER_R * 0.15, -PLAYER_R * 0.6, PLAYER_R * 0.5, -PLAYER_R * 0.4);
+            ctx.fill();
+
+            // cheeks
+            ctx.fillStyle = "rgba(255, 64, 64, 0.9)";
+            ctx.beginPath();
+            ctx.ellipse(-PLAYER_R * 0.55, PLAYER_R * 0.05, 7, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(PLAYER_R * 0.55, PLAYER_R * 0.05, 7, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // eyes
+            const eyeClosed = this.eyeBlink < 0;
+            ctx.fillStyle = "#1a1a1a";
+            if (eyeClosed) {
+              ctx.fillRect(-PLAYER_R * 0.28, -PLAYER_R * 0.05, 10, 2);
+              ctx.fillRect(PLAYER_R * 0.18, -PLAYER_R * 0.05, 10, 2);
+            } else {
+              ctx.beginPath();
+              ctx.arc(-PLAYER_R * 0.25, -PLAYER_R * 0.12, 5, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.beginPath();
+              ctx.arc(PLAYER_R * 0.25, -PLAYER_R * 0.12, 5, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = "#fff";
+              ctx.beginPath();
+              ctx.arc(-PLAYER_R * 0.22, -PLAYER_R * 0.16, 2, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.beginPath();
+              ctx.arc(PLAYER_R * 0.28, -PLAYER_R * 0.16, 2, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            // HIT text
+            if (this.hitFX > 0) {
+              ctx.save();
+              ctx.globalAlpha = Math.min(1, this.hitFX / 0.25);
+              ctx.fillStyle = "#fff";
+              ctx.font = "bold 16px ui-sans-serif, system-ui";
+              ctx.textAlign = "center";
+              ctx.fillText("HIT!", 0, -PLAYER_R - 18);
+              ctx.restore();
+            }
+
+            ctx.restore();
+          }
+
+          makeAI(level) {
+            const profs = {
+              easy: {moveSpeed: 360, jumpAggro: 0.45, react: 0.11, misAim: 70, upBias: 0.35, hitChance: 0.75},
+              normal: {moveSpeed: 430, jumpAggro: 0.62, react: 0.08, misAim: 40, upBias: 0.45, hitChance: 0.9},
+              hard: {moveSpeed: 510, jumpAggro: 0.78, react: 0.05, misAim: 18, upBias: 0.55, hitChance: 0.98},
+            };
+            const P = profs[level] || profs.normal;
+            return {
+              targetX: this.x,
+              lastThink: 0,
+              wantHit: false,
+              wantUp: false,
+              left: false,
+              right: false,
+              jump: false,
+              hit: false,
+              prof: P,
+            };
+          }
+          updateAI(dt, ball) {
+            const ai = this.ai;
+            ai.lastThink -= dt;
+            if (ai.lastThink <= 0) {
+              ai.lastThink = ai.prof.react + Math.random() * 0.02;
+              const onMySide = this.side === "L" ? ball.x < NET_X : ball.x > NET_X + NET_W;
+              const willCome = this.side === "L" ? ball.vx < 0 : ball.vx > 0;
+              let tgt = this.side === "L" ? WORLD_W * 0.25 : WORLD_W * 0.75;
+              if (onMySide || willCome) {
+                const g = PHYS.g;
+                const tToGround = timeToGround(ball.y, ball.vy, GROUND_Y - ball.r, g);
+                let predX = ball.x + ball.vx * tToGround;
+                if (predX < BALL_R) predX = BALL_R + (BALL_R - predX);
+                if (predX > WORLD_W - BALL_R) predX = WORLD_W - BALL_R - (predX - (WORLD_W - BALL_R));
+                if (this.side === "L") predX = Math.min(predX, NET_X - PLAYER_R * 0.6);
+                else predX = Math.max(predX, NET_X + NET_W + PLAYER_R * 0.6);
+                predX += (Math.random() * 2 - 1) * ai.prof.misAim;
+                tgt = predX;
+              }
+              ai.wantUp = Math.random() < ai.prof.upBias && ball.y < NET_TOP + 30;
+              const dx = Math.abs(this.x - ball.x);
+              ai.wantHit = Math.random() < ai.prof.hitChance && dx < 110 && ball.y < this.y - 10;
+              ai.targetX = tgt;
+            }
+            const [minX, maxX] = this.bounds();
+            ai.targetX = clamp(ai.targetX, minX + 6, maxX - 6);
+            const err = ai.targetX - this.x;
+            const dir = Math.sign(err);
+            ai.left = dir < 0;
+            ai.right = dir > 0;
+            const goodHeight = ball.y < this.y - 10 && ball.y > this.y - 170;
+            const nearX = Math.abs(this.x - ball.x) < 80 + this.ai.prof.misAim * 0.4;
+            ai.jump = goodHeight && nearX && Math.random() < this.ai.prof.jumpAggro;
+            ai.hit = ai.wantHit && nearX && goodHeight && this.hitCooldown <= 0;
+          }
+        }
+
+        function timeToGround(y, vy, ground, g) {
+          const A = 0.5 * g,
+            B = vy,
+            C = y - ground;
+          const disc = B * B - 4 * A * C;
+          if (disc < 0) return 0.2;
+          const t1 = (-B + Math.sqrt(disc)) / (2 * A);
+          const t2 = (-B - Math.sqrt(disc)) / (2 * A);
+          const t = Math.max(t1, t2);
+          return clamp(t, 0.02, 1.2);
+        }
+
+        // Game orchestration
+        const GameState = {MENU: 0, PLAY: 1, POINT: 2, OVER: 3, PAUSE: 4};
+        const GameEvents = {
+          pointScored: (winnerSide, where) => {
+            game.onPointScored(winnerSide, where);
+          },
+        };
+        const game = {
+          state: GameState.MENU,
+          players: [],
+          ball: new Ball(),
+          scoreL: 0,
+          scoreR: 0,
+          server: "L",
+          target: options.goal,
+          rule: options.rule,
+          mode: options.mode,
+          ai: options.ai,
+          paused: false,
+          debug: false,
+          lastTs: 0,
+          accum: 0,
+          setup() {
+            this.mode = options.mode;
+            this.ai = options.ai;
+            this.target = options.goal;
+            this.rule = options.rule;
+            const leftIsCPU = false;
+            const rightIsCPU = this.mode === "cpu";
+            this.players = [new Player("L", leftIsCPU, this.ai), new Player("R", rightIsCPU, this.ai)];
+            this.players[0].name = "Sparky";
+            this.players[1].name = this.mode === "cpu" ? "CPU" : "Bolt";
+            nameL.textContent = this.players[0].name;
+            nameR.textContent = this.players[1].name;
+            this.scoreL = 0;
+            this.scoreR = 0;
+            this.server = Math.random() < 0.5 ? "L" : "R";
+            this.updateScoreUI();
+            this.prepareServe();
+          },
+          prepareServe() {
+            this.ball = new Ball();
+            this.ball.resetForServe(this.server === "L");
+            this.state = GameState.PLAY;
+            this.updateServeBadge();
+          },
+          updateScoreUI() {
+            ptsL.textContent = String(this.scoreL);
+            ptsR.textContent = String(this.scoreR);
+          },
+          updateServeBadge() {
+            srvL.style.display = this.server === "L" ? "" : "none";
+            srvR.style.display = this.server === "R" ? "" : "none";
+          },
+          onPointScored(winnerSide, where) {
+            if (this.state !== GameState.PLAY) return;
+            this.state = GameState.POINT;
+            if (winnerSide === "L") this.scoreL++;
+            else this.scoreR++;
+            this.updateScoreUI();
+            AudioKit.chord(winnerSide === "L" ? [660, 880] : [520, 780], 0.18, 0.05);
+            const win = this.checkGameOver();
+            if (win) {
+              this.state = GameState.OVER;
+              overlay.querySelector(".subtitle").innerHTML = `<span class="win">${
+                win === "L" ? this.players[0].name : this.players[1].name
+              }</span> 승리! 다시 시작하려면 '게임 시작'을 누르세요.`;
+              overlay.classList.add("show");
+              startBtn.textContent = "다시 시작";
+              return;
+            }
+            this.server = winnerSide;
+            this.updateServeBadge();
+            this.players[0].x = WORLD_W * 0.2;
+            this.players[0].y = GROUND_Y - PLAYER_R;
+            this.players[0].vx = 0;
+            this.players[0].vy = 0;
+            this.players[1].x = WORLD_W * 0.8;
+            this.players[1].y = GROUND_Y - PLAYER_R;
+            this.players[1].vx = 0;
+            this.players[1].vy = 0;
+            setTimeout(() => {
+              this.prepareServe();
+            }, 900);
+          },
+          checkGameOver() {
+            const target = this.target;
+            if (this.rule === "std") {
+              if (this.scoreL >= target || this.scoreR >= target) return this.scoreL > this.scoreR ? "L" : "R";
+            } else {
+              if (this.scoreL >= target || this.scoreR >= target)
+                if (Math.abs(this.scoreL - this.scoreR) >= 2) return this.scoreL > this.scoreR ? "L" : "R";
+            }
+            return null;
+          },
+          togglePause() {
+            if (this.state === GameState.PLAY) {
+              this.state = GameState.PAUSE;
+              overlay.classList.add("show");
+            } else if (this.state === GameState.PAUSE) {
+              this.state = GameState.PLAY;
+              overlay.classList.remove("show");
+            }
+          },
+          resetRound() {
+            if (this.state === GameState.PLAY || this.state === GameState.PAUSE) this.prepareServe();
+          },
+        };
+
+        startBtn.addEventListener("click", () => {
+          overlay.classList.remove("show");
+          game.setup();
+          game.state = GameState.PLAY;
+          startBtn.textContent = "게임 시작";
+          overlay.querySelector(".subtitle").textContent =
+            "오마주 캐릭터로 즐기는 배구! GitHub Pages에서 바로 실행 가능";
+        });
+        window.addEventListener("keydown", (e) => {
+          if (e.code === "KeyP" || e.code === "Escape") {
+            if (game.state === GameState.MENU || game.state === GameState.OVER) return;
+            game.togglePause();
+          } else if (e.code === "KeyR") {
+            game.resetRound();
+          } else if (e.code === "F3") {
+            game.debug = !game.debug;
+          }
+        });
+
+        // Drawing
+        function drawCourt(ctx) {
+          ctx.save();
+          // clouds
+          ctx.globalAlpha = 0.15;
+          ctx.fillStyle = "#fff";
+          for (let i = 0; i < 6; i++) {
+            const cx = (i * 180 + 80) % WORLD_W,
+              cy = 80 + (i % 2) * 20;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, 50 + (i % 3) * 20, 18 + (i % 2) * 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+          // ground
+          const grd = ctx.createLinearGradient(0, GROUND_Y - 30, 0, WORLD_H);
+          grd.addColorStop(0, "#e8c78f");
+          grd.addColorStop(1, "#d19d63");
+          ctx.fillStyle = grd;
+          ctx.fillRect(0, GROUND_Y, WORLD_W, WORLD_H - GROUND_Y);
+          // baseline
+          ctx.strokeStyle = "rgba(0,0,0,.06)";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, GROUND_Y + 1.5);
+          ctx.lineTo(WORLD_W, GROUND_Y + 1.5);
+          ctx.stroke();
+          // net posts
+          ctx.fillStyle = "#5d7aff";
+          ctx.fillRect(NET_X - 6, NET_TOP - 16, 6, NET_H + 24);
+          ctx.fillRect(NET_X + NET_W, NET_TOP - 16, 6, NET_H + 24);
+          // mesh
+          ctx.fillStyle = "#ffffff";
+          ctx.globalAlpha = 0.92;
+          ctx.fillRect(NET_X, NET_TOP, NET_W, NET_H);
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = "rgba(0,0,0,.08)";
+          ctx.lineWidth = 1;
+          for (let y = NET_TOP; y < GROUND_Y; y += 10) {
+            ctx.beginPath();
+            ctx.moveTo(NET_X, y + 0.5);
+            ctx.lineTo(NET_X + NET_W, y + 0.5);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+        function drawDebug(ctx, ball, players) {
+          if (!game.debug) return;
+          ctx.save();
+          ctx.fillStyle = "#000000a0";
+          ctx.fillRect(8, WORLD_H - 92, 270, 92);
+          ctx.fillStyle = "#8ff";
+          ctx.font = "12px ui-monospace, monospace";
+          const lines = [
+            `Ball x=${ball.x.toFixed(1)} y=${ball.y.toFixed(1)} vx=${ball.vx.toFixed(1)} vy=${ball.vy.toFixed(
+              1
+            )} spin=${ball.spin.toFixed(2)}`,
+            `P1 x=${players[0].x.toFixed(1)} y=${players[0].y.toFixed(1)} vx=${players[0].vx.toFixed(
+              1
+            )} vy=${players[0].vy.toFixed(1)} onG=${players[0].onGround}`,
+            `P2 x=${players[1].x.toFixed(1)} y=${players[1].y.toFixed(1)} vx=${players[1].vx.toFixed(
+              1
+            )} vy=${players[1].vy.toFixed(1)} onG=${players[1].onGround}`,
+            `Server=${game.server} Score=${game.scoreL}-${game.scoreR} Target=${game.target} Rule=${game.rule}`,
+          ];
+          for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], 14, WORLD_H - 68 + i * 16);
+          for (const p of game.players)
+            if (p.isCPU) {
+              ctx.strokeStyle = "rgba(0,255,255,.7)";
+              ctx.setLineDash([6, 4]);
+              ctx.beginPath();
+              ctx.moveTo(p.ai.targetX, 0);
+              ctx.lineTo(p.ai.targetX, WORLD_H);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+          ctx.restore();
+        }
+
+        // Fixed-step simulation
+        function simulate(step) {
+          const p1 = game.players[0],
+            p2 = game.players[1];
+          p1.update(step, game.ball);
+          p2.update(step, game.ball);
+          game.ball.update(step, [p1, p2]);
+        }
+        function render(ts) {
+          const now = ts || performance.now();
+          let dt = (now - game.lastTs) / 1000;
+          if (!isFinite(dt) || dt > 0.05) dt = 1 / 60;
+          game.lastTs = now;
+
+          if (game.state === GameState.PLAY) {
+            game.accum += dt;
+            const step = PHYS.substep;
+            let it = 0;
+            while (game.accum >= step && it < PHYS.maxSubsteps) {
+              simulate(step);
+              if (game.state !== GameState.PLAY) {
+                game.accum = 0;
+                break;
+              }
+              game.accum -= step;
+              it++;
+            }
+          }
+
+          ctx.clearRect(0, 0, WORLD_W, WORLD_H);
+          drawCourt(ctx);
+          game.ball.draw(ctx);
+          for (const p of game.players) p.draw(ctx);
+          drawDebug(ctx, game.ball, game.players);
+
+          requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+        game.state = GameState.MENU;
+      })();
+    </script>
+  </body>
+</html>
